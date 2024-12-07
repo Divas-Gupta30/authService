@@ -1,9 +1,9 @@
-version: '3.8'
-
+version: '3'
 services:
-  auth-system:
-    build: .
+  auth-service:  # This is the service name
+    build:
+      context: .  # Current directory as the build context
+      dockerfile: DockerFile  # Specify the Dockerfile to use
+    image: authservice-authservice  # Name of the image (this is what Docker builds)
     ports:
       - "8080:8080"
-    environment:
-      - JWT_SECRET=mysecret

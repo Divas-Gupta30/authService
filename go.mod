@@ -1,6 +1,6 @@
 module github.com/Divas-Gupta30/authService
 
-go 1.23.3
+go 1.19
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
