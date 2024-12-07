@@ -1,12 +1,10 @@
 package models
 
-// User struct represents a user in memory
 type User struct {
-	Email    string
-	Password string
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
 }
 
-// Token struct represents a token in memory
 type Token struct {
 	UserID  string
 	Token   string
