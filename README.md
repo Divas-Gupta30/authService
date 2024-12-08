@@ -9,6 +9,7 @@
 5) curl -X POST -H "Authorization: Bearer <JWT_TOKEN>" http://localhost:8080/revoke <br />
 
 
-# Docker Command
-Checkout */authService and run below command : <br />
-docker-compose up --build
+# Steps to run
+1) Clone the repo <br />
+2) Go to  */authService path <br />
+3) Run: <b> docker-compose up --build</b>
