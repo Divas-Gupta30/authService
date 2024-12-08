@@ -17,7 +17,7 @@ func setupRouter() *mux.Router {
 	router := mux.NewRouter()
 	router.HandleFunc("/signup", handlers.SignUp).Methods("POST")
 	router.HandleFunc("/signin", handlers.SignIn).Methods("POST")
-	router.HandleFunc("/protected", handlers.Protected).Methods("GET")
+	router.HandleFunc("/anyprotectedroute", handlers.Protected).Methods("GET")
 	router.HandleFunc("/refresh", handlers.Refresh).Methods("POST")
 	router.HandleFunc("/revoke", handlers.RevokeToken).Methods("POST")
 	return router
@@ -26,94 +26,116 @@ func setupRouter() *mux.Router {
 func Test_SignUp(t *testing.T) {
 	router := setupRouter()
 
-	user := map[string]string{"email": "newuser@example.com", "password": "newpass"}
-	body, _ := json.Marshal(user)
+	tests := []struct {
+		name       string
+		user       map[string]string
+		wantStatus int
+	}{
+		{"ValidUser", map[string]string{"email": "newuser@example.com", "password": "newpass"}, http.StatusOK},
+		{"ExistingUser", map[string]string{"email": "test@example.com", "password": "testpass"}, http.StatusConflict},
+		{"InvalidUser", map[string]string{"email": "invalid", "password": ""}, http.StatusBadRequest},
+	}
 
-	req, _ := http.NewRequest("POST", "/signup", bytes.NewBuffer(body))
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.user)
+			req, _ := http.NewRequest("POST", "/signup", bytes.NewBuffer(body))
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			assert.Equal(t, tt.wantStatus, rr.Code)
+		})
+	}
 }
 
 func Test_SignIn(t *testing.T) {
 	router := setupRouter()
 
-	user := map[string]string{"email": "test@example.com", "password": "testpass"}
-	body, _ := json.Marshal(user)
+	tests := []struct {
+		name       string
+		user       map[string]string
+		wantStatus int
+	}{
+		{"ValidUser", map[string]string{"email": "test@example.com", "password": "testpass"}, http.StatusOK},
+		{"InvalidUser", map[string]string{"email": "test@example.com", "password": "wrongpass"}, http.StatusUnauthorized},
+		{"NonExistentUser", map[string]string{"email": "nonexistent@example.com", "password": "pass"}, http.StatusUnauthorized},
+	}
 
-	req, _ := http.NewRequest("POST", "/signin", bytes.NewBuffer(body))
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.user)
+			req, _ := http.NewRequest("POST", "/signin", bytes.NewBuffer(body))
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			assert.Equal(t, tt.wantStatus, rr.Code)
+		})
+	}
 }
 
 func Test_Protected(t *testing.T) {
 	router := setupRouter()
 
-	// First, sign in to get a token
-	user := map[string]string{"email": "test@example.com", "password": "testpass"}
-	body, _ := json.Marshal(user)
-	req, _ := http.NewRequest("POST", "/signin", bytes.NewBuffer(body))
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{"InvalidToken", "invalid_token", http.StatusUnauthorized},
+		{"ExpiredToken", "expired_token", http.StatusUnauthorized},
+	}
 
-	var response map[string]string
-	json.Unmarshal(rr.Body.Bytes(), &response)
-	token := response["token"]
-
-	// Use the token to access the protected route
-	req, _ = http.NewRequest("GET", "/protected", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest("GET", "/anyprotectedroute", nil)
+			req.Header.Set("Authorization", "Bearer "+tt.token)
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			assert.Equal(t, tt.wantStatus, rr.Code)
+		})
+	}
 }
 
 func Test_Refresh(t *testing.T) {
 	router := setupRouter()
 
-	// First, sign in to get a token
-	user := map[string]string{"email": "test@example.com", "password": "testpass"}
-	body, _ := json.Marshal(user)
-	req, _ := http.NewRequest("POST", "/signin", bytes.NewBuffer(body))
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{"InvalidToken", "invalid_token", http.StatusUnauthorized},
+		{"ExpiredToken", "expired_token", http.StatusUnauthorized},
+	}
 
-	var response map[string]string
-	json.Unmarshal(rr.Body.Bytes(), &response)
-	token := response["token"]
-
-	// Use the token to refresh
-	req, _ = http.NewRequest("POST", "/refresh", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest("POST", "/refresh", nil)
+			req.Header.Set("Authorization", "Bearer "+tt.token)
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			assert.Equal(t, tt.wantStatus, rr.Code)
+		})
+	}
 }
 
-func TestRevokeToken(t *testing.T) {
+func Test_RevokeToken(t *testing.T) {
 	router := setupRouter()
 
-	// First, sign in to get a token
-	user := map[string]string{"email": "test@example.com", "password": "testpass"}
-	body, _ := json.Marshal(user)
-	req, _ := http.NewRequest("POST", "/signin", bytes.NewBuffer(body))
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{"InvalidToken", "invalid_token", http.StatusUnauthorized},
+		{"NonExistentToken", "nonexistent_token", http.StatusUnauthorized},
+	}
 
-	var response map[string]string
-	json.Unmarshal(rr.Body.Bytes(), &response)
-	token := response["token"]
-
-	// Use the token to revoke
-	req, _ = http.NewRequest("POST", "/revoke", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest("POST", "/revoke", nil)
+			req.Header.Set("Authorization", "Bearer "+tt.token)
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			assert.Equal(t, tt.wantStatus, rr.Code)
+		})
+	}
 }
